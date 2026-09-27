@@ -11,6 +11,7 @@
 - `rfc.py` owns the runtime implementation.
 - `rfc.py.dox.md` owns durable notes about responsibilities, contracts, side effects, and verification for that implementation.
 - Classes:
+- `RFCUnavailableError` (`ConnectionError`)
 - `RFCInput` (`TypedDict`)
 - `RFCCall` (`TypedDict`)
 - Top-level functions:
@@ -22,6 +23,10 @@
 
 ## Runtime Contracts
 
+- `RFCUnavailableError` is raised only when connection establishment failed
+  before the endpoint could accept a request. HTTP errors, timeouts, and
+  post-connect failures are not converted because retrying them locally could
+  duplicate a remotely accepted mutation.
 - Helper modules own reusable framework APIs and must preserve public callers unless all callers, tests, and docs are updated together.
 - Update this file whenever public functions, classes, persistence behavior, path/security assumptions, side effects, or cross-module contracts change.
 - Observed side-effect areas: filesystem writes, network calls, settings/state persistence, secret handling.
@@ -41,7 +46,8 @@
 ## Verification
 
 - Run targeted tests for changed helper behavior; run security regressions for auth, filesystem, WebSocket, tunnel, upload, or secret-handling helpers.
-- No direct test reference was found by name search; choose the nearest behavioral test or perform a focused smoke check.
+- `tests/test_runtime_rfc_fallback.py` verifies connector-only fallback and
+  propagation of ambiguous or remote failures.
 
 ## Child DOX Index
 

@@ -99,22 +99,34 @@ async def call_development_function(
     func: Union[Callable[..., T], Callable[..., Awaitable[T]]], *args, **kwargs
 ) -> T:
     if is_development():
-        url = _get_rfc_url()
-        password = _get_rfc_password()
-        # Normalize path components to build a valid Python module path across OSes
-        module_path = Path(
-            files.deabsolute_path(func.__code__.co_filename)
-        ).with_suffix("")
-        module = ".".join(module_path.parts)  # __module__ is not reliable
-        result = await rfc.call_rfc(
-            url=url,
-            password=password,
-            module=module,
-            function_name=func.__name__,
-            args=list(args),
-            kwargs=kwargs,
-        )
-        return cast(T, result)
+        try:
+            url = _get_rfc_url()
+            password = _get_rfc_password()
+            # Normalize path components to build a valid Python module path across OSes
+            module_path = Path(
+                files.deabsolute_path(func.__code__.co_filename)
+            ).with_suffix("")
+            module = ".".join(module_path.parts)  # __module__ is not reliable
+            result = await rfc.call_rfc(
+                url=url,
+                password=password,
+                module=module,
+                function_name=func.__name__,
+                args=list(args),
+                kwargs=kwargs,
+            )
+            return cast(T, result)
+        except rfc.RFCUnavailableError as exc:
+            # A connector failure means no RFC request was accepted, so a
+            # local fallback cannot duplicate remote work. Ambiguous timeout,
+            # response, authentication, and remote-function errors propagate.
+            from helpers.print_style import PrintStyle
+
+            PrintStyle.warning(f"RFC fallback to direct: {exc}")
+            if inspect.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            else:
+                return func(*args, **kwargs)
     else:
         if inspect.iscoroutinefunction(func):
             return await func(*args, **kwargs)
@@ -129,7 +141,7 @@ async def handle_rfc(rfc_call: rfc.RFCCall):
 def _get_rfc_password() -> str:
     password = dotenv.get_dotenv_value(dotenv.KEY_RFC_PASSWORD)
     if not password:
-        raise Exception("No RFC password, cannot handle RFC calls.")
+        raise rfc.RFCUnavailableError("No RFC password is configured.")
     return password
 
 

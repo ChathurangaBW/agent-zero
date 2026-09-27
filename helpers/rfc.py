@@ -13,6 +13,15 @@ from helpers import dotenv
 # Secured by pre-shared key
 
 
+class RFCUnavailableError(ConnectionError):
+    """RFC connection establishment failed before a request was accepted.
+
+    Callers may safely fall back to local execution only for this exception.
+    Response errors, disconnects after connection, and timeouts remain
+    ambiguous and deliberately propagate without a local retry.
+    """
+
+
 class RFCInput(TypedDict):
     module: str
     function_name: str
@@ -68,14 +77,17 @@ def _get_function(module: str, function_name: str):
 
 
 async def _send_json_data(url: str, data):
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url,
-            json=data,
-        ) as response:
-            if response.status == 200:
-                result = await response.json()
-                return result
-            else:
-                error = await response.text()
-                raise Exception(error)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=data,
+            ) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    return result
+                else:
+                    error = await response.text()
+                    raise Exception(error)
+    except aiohttp.ClientConnectorError as exc:
+        raise RFCUnavailableError(f"RFC endpoint is unavailable: {exc}") from exc

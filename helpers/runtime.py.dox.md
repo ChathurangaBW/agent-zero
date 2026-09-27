@@ -35,6 +35,10 @@
 
 ## Runtime Contracts
 
+- In development mode, `call_development_function` executes locally only when
+  RFC is unconfigured or connection establishment failed. It never retries
+  locally after timeouts, HTTP errors, authentication failures, or remote
+  function failures, so a mutating function executes at most once.
 - Helper modules own reusable framework APIs and must preserve public callers unless all callers, tests, and docs are updated together.
 - Update this file whenever public functions, classes, persistence behavior, path/security assumptions, side effects, or cross-module contracts change.
 - Observed side-effect areas: filesystem reads, filesystem writes, subprocess/runtime control, settings/state persistence, secret handling, tunnel state.
@@ -63,6 +67,7 @@
   - `tests/test_host_browser_connector.py`
   - `tests/test_http_auth_csrf.py`
   - `tests/test_image_get_security.py`
+  - `tests/test_runtime_rfc_fallback.py`
 
 ## Child DOX Index
 

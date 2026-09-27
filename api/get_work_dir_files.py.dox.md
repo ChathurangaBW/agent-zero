@@ -32,6 +32,8 @@
 
 - Important called helpers/classes observed in the source: `FileBrowser`, `browser.get_files`, `runtime.call_development_function`.
 - Empty `path` requests and explicit `$WORK_DIR` requests resolve to the default workdir path before `FileBrowser` is called, so the WebUI never receives an empty startup path for the default file browser view.
+- Development RFC fallback is owned by `helpers.runtime`; this endpoint does
+  not catch ambiguous remote failures or repeat a listing independently.
 - Keep request/response, tool, or helper semantics documented here at the same time as source changes.
 
 ## Work Guidance

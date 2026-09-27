@@ -19,8 +19,6 @@ class GetWorkDirFiles(ApiHandler):
             #     current_path = "root"
             current_path = "/a0"
 
-        # browser = FileBrowser()
-        # result = browser.get_files(current_path)
         result = await runtime.call_development_function(get_files, current_path)
 
         return {"data": result, "limits": FileBrowser.limits()}
