@@ -108,3 +108,4 @@ Direct child DOX files:
 | [_whatsapp_integration/AGENTS.md](_whatsapp_integration/AGENTS.md) | WhatsApp Baileys bridge integration. |
 | [_whats_new/AGENTS.md](_whats_new/AGENTS.md) | Version-gated What's New showcase modal, card list, and startup trigger. |
 | [_whisper_stt/AGENTS.md](_whisper_stt/AGENTS.md) | Whisper speech-to-text integration. |
+| [_web_pentest/AGENTS.md](_web_pentest/AGENTS.md) | Evidence-backed web assessment, isolated HTTP identities, coverage and finding verification. |

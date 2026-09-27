@@ -26,6 +26,7 @@ docs focus on practical setup, screenshots, and user workflows.
 - **[Agent Zero Launcher](guides/launcher.md):** Fresh-machine Launcher walkthrough, Docker setup gate, Installs, Instances, and docs screenshot capture with Playwright/Electron.
 - **[First-Run Onboarding](guides/onboarding.md):** Set up OpenRouter, our proxy API or another provider with the guided wizard.
 - **[Browser Guide](guides/browser.md):** Use the built-in Browser, live Canvas surface, annotations, screenshots, host browser mode, and extensions.
+- **[Web Pentesting](guides/web-pentesting.md):** Run scoped, identity-isolated assessments with durable evidence, coverage and verification.
 - **[Desktop Guide](guides/desktop.md):** Use the built-in Linux desktop, GUI apps, and LibreOffice Writer/Calc/Impress Cowork.
 - **[A0 CLI Connector](guides/a0-cli-connector.md):** Terminal-first host connector for Agent Zero, with screenshots of the host picker, connected shell, command palette, and Browser modes.
 - **[Create a Small Plugin](guides/create-plugin.md):** Build and review a tiny Web UI plugin that adds an unread dot to the chat list.
@@ -118,6 +119,7 @@ docs focus on practical setup, screenshots, and user workflows.
     - [Backup And Restore](guides/usage.md#backup-and-restore)
   - [Agent Zero Launcher](guides/launcher.md)
   - [Browser Guide](guides/browser.md)
+  - [Web Pentesting](guides/web-pentesting.md)
   - [Desktop Guide](guides/desktop.md)
   - [A0 CLI Connector](guides/a0-cli-connector.md)
   - [Create a Small Plugin](guides/create-plugin.md)
