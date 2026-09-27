@@ -1,6 +1,6 @@
 # OAuth Connections
 
-Generic local OAuth bridge for Agent Zero.
+Account-backed model connections for Agent Zero.
 
 Tokens in `auth.json` are password-equivalent credentials. Keep this plugin on trusted local machines only. Do not configure `auth_file_path` to share a rotating refresh-token file with Codex CLI or another client.
 
@@ -17,7 +17,8 @@ OAuth-backed model providers do not require users to enter API keys. Agent Zero 
 - Uses the existing Codex device-code flow.
 - Writes Codex-compatible credentials to an Agent Zero-owned `auth.json` file.
 - Refreshes local tokens when needed.
-- Exposes the local OpenAI-compatible wrapper at `/oauth/codex/v1`.
+- Sends Agent Zero main, utility, and subordinate inference directly to the ChatGPT Codex backend; no Codex CLI or external relay is required.
+- Exposes the local OpenAI-compatible wrapper at `/oauth/codex/v1` only for compatibility clients, model discovery, and diagnostics.
 - Lets users choose default reasoning effort, visible reasoning summaries, and answer verbosity while preserving explicit per-request settings.
 
 ### GitHub Copilot (`github_copilot_oauth`)

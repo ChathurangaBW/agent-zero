@@ -1,7 +1,7 @@
 name: _oauth
 title: OAuth Connections
-description: Generic local OAuth bridge for account-backed providers. Includes Codex/ChatGPT Account as the first provider.
-version: 0.1.0
+description: Account-backed model connections with direct Codex/ChatGPT inference and compatibility APIs.
+version: 0.2.0
 always_enabled: false
 settings_sections:
   - external

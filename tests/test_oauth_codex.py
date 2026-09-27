@@ -23,6 +23,12 @@ from plugins._oauth.extensions.python._functions.models.get_api_key.end import (
 from plugins._oauth.extensions.python.chat_model_call_before._20_codex_session import (
     CodexSession,
 )
+from plugins._oauth.extensions.python.chat_model_call_before._10_direct_codex import (
+    DirectCodex,
+)
+from plugins._oauth.extensions.python.util_model_call_before._10_direct_codex import (
+    DirectCodexUtility,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -253,6 +259,71 @@ def test_codex_session_metadata_is_stable_and_scoped(monkeypatch):
     assert explicit["caller"] == "keep"
     assert explicit["x-codex-installation-id"] == "install-1"
     assert prepare(provider="openai") is None
+
+
+def test_codex_model_calls_use_direct_oauth_transport(monkeypatch):
+    from plugins._oauth.helpers import direct_codex
+
+    monkeypatch.setattr(
+        direct_codex.codex,
+        "load_auth",
+        lambda: codex.EffectiveAuth("access-token", "account-1"),
+    )
+    monkeypatch.setattr(
+        direct_codex,
+        "codex_config",
+        lambda: {
+            "upstream_base_url": "https://chatgpt.example/backend-api/codex",
+            "reasoning_effort": "high",
+            "reasoning_summary": "auto",
+            "text_verbosity": "medium",
+        },
+    )
+    monkeypatch.setattr(direct_codex.codex, "resolve_installation_id", lambda: "install-1")
+    monkeypatch.setattr(direct_codex.codex, "resolve_codex_version", lambda: "0.155.1")
+    model = SimpleNamespace(
+        a0_model_conf=SimpleNamespace(provider="codex_oauth"),
+        kwargs={"api_base": "http://127.0.0.1/oauth/codex/v1", "keep": True},
+    )
+    agent = SimpleNamespace(context=SimpleNamespace(id="chat-1"), number=2)
+    call_data = {"model": model}
+
+    DirectCodex(agent=agent).execute(call_data=call_data)
+
+    assert model.kwargs["api_base"] == "https://chatgpt.example/backend-api/codex"
+    assert model.kwargs["api_key"] == "access-token"
+    assert model.kwargs["responses_state"] == "local"
+    assert model.kwargs["prompt_cache_key"] == "agent-zero-chat-1-2"
+    assert model.kwargs["extra_body"]["client_metadata"]["session_id"] == "agent-zero-chat-1-2"
+    assert model.kwargs["extra_headers"]["chatgpt-account-id"] == "account-1"
+    assert model.kwargs["extra_headers"]["session-id"] == "agent-zero-chat-1-2"
+    assert model.kwargs["extra_headers"]["version"] == "0.155.1"
+    assert call_data["response_callback"] is not None
+
+
+def test_codex_utility_calls_force_stream_collection(monkeypatch):
+    monkeypatch.setattr(
+        "plugins._oauth.extensions.python.util_model_call_before."
+        "_10_direct_codex.configure_direct_codex_model",
+        lambda model, agent: True,
+    )
+    call_data = {"model": SimpleNamespace(), "callback": None}
+
+    DirectCodexUtility(agent=SimpleNamespace()).execute(call_data=call_data)
+
+    assert call_data["callback"] is not None
+
+
+def test_oauth_proxy_port_extension_ignores_non_oauth_models(monkeypatch):
+    kwargs = {"api_base": "https://api.openai.com/v1"}
+    model = SimpleNamespace(
+        a0_model_conf=SimpleNamespace(provider="openai"),
+        kwargs=kwargs,
+    )
+
+    DirectCodex(agent=SimpleNamespace()).execute(call_data={"model": model})
+
+    assert model.kwargs is kwargs
 
 
 @pytest.mark.parametrize("session_id", ["chat-session", "x" * 100])
