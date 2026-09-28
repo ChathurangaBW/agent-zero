@@ -2,6 +2,13 @@
 
 ## Purpose
 
+- Local/native deployments keep the framework scheduler and plugin job hooks
+  running even when no development RFC transport exists. Container pause is
+  remote-only: it must never fall back to pausing this process.
+- `run_iteration()` performs one bounded scheduler cycle; `run_loop()` owns the
+  existing 60-second interval. Ambiguous/auth/remote pause errors skip the local
+  cycle to avoid duplicate scheduling. Explicit local pause/resume stays intact.
+
 - Own the `job_loop.py` helper module.
 - This module runs periodic scheduler and maintenance loops.
 - Keep this file-level DOX profile synchronized with `job_loop.py` because this directory is intentionally flat.
@@ -12,6 +19,7 @@
 - `job_loop.py.dox.md` owns durable notes about responsibilities, contracts, side effects, and verification for that implementation.
 - Top-level functions:
 - `async run_loop()`
+- `async run_iteration()`
 - `async scheduler_tick()`
 - `pause_loop()`
 - `resume_loop()`
@@ -26,7 +34,7 @@
 
 ## Key Concepts
 
-- Important called helpers/classes observed in the source: `time.time`, `runtime.is_development`, `scheduler.tick`, `call_extensions_async`, `resume_loop`, `asyncio.sleep`, `runtime.call_development_function`, `PrintStyle.error`, `scheduler_tick`, `errors.format_error`, `PrintStyle`, `errors.error_text`.
+- Important called helpers/classes observed in the source: `time.time`, `runtime.is_development`, `scheduler.tick`, `call_extensions_async`, `resume_loop`, `asyncio.sleep`, `runtime.call_remote_development_function`, `PrintStyle.error`, `scheduler_tick`, `errors.format_error`, `PrintStyle`, `errors.error_text`.
 - Keep request/response, tool, or helper semantics documented here at the same time as source changes.
 
 ## Work Guidance
@@ -40,6 +48,7 @@
 - Run targeted tests for changed helper behavior; run security regressions for auth, filesystem, WebSocket, tunnel, upload, or secret-handling helpers.
 - Related tests observed by source search:
   - `tests/test_api_chat_lifetime.py`
+  - `tests/test_job_loop_native_runtime.py`
 
 ## Child DOX Index
 

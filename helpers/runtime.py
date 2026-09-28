@@ -112,22 +112,7 @@ async def call_development_function(
 ) -> T:
     if is_development():
         try:
-            url = _get_rfc_url()
-            password = _get_rfc_password()
-            # Normalize path components to build a valid Python module path across OSes
-            module_path = Path(
-                files.deabsolute_path(func.__code__.co_filename)
-            ).with_suffix("")
-            module = ".".join(module_path.parts)  # __module__ is not reliable
-            result = await rfc.call_rfc(
-                url=url,
-                password=password,
-                module=module,
-                function_name=func.__name__,
-                args=list(args),
-                kwargs=kwargs,
-            )
-            return cast(T, result)
+            return await call_remote_development_function(func, *args, **kwargs)
         except rfc.RFCUnavailableError as exc:
             # A connector failure means no RFC request was accepted, so a
             # local fallback cannot duplicate remote work. Ambiguous timeout,
@@ -142,6 +127,18 @@ async def call_development_function(
             return await func(*args, **kwargs)
         else:
             return func(*args, **kwargs)  # type: ignore
+
+
+async def call_remote_development_function(
+    func: Union[Callable[..., T], Callable[..., Awaitable[T]]], *args, **kwargs
+) -> T:
+    """RFC-only control operations must never act on this local process."""
+    url = _get_rfc_url()
+    password = _get_rfc_password()
+    module_path = Path(files.deabsolute_path(func.__code__.co_filename)).with_suffix("")
+    result = await rfc.call_rfc(url=url, password=password, module=".".join(module_path.parts),
+                               function_name=func.__name__, args=list(args), kwargs=kwargs)
+    return cast(T, result)
 
 
 async def handle_rfc(rfc_call: rfc.RFCCall):

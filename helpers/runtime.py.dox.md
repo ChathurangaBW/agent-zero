@@ -24,6 +24,8 @@
 - `async call_development_function(func: Callable[..., T], *args, **kwargs) -> T`
 - `async call_development_function(func: Union[Callable[..., T], Callable[..., Awaitable[T]]], *args, **kwargs) -> T`
 - `async handle_rfc(rfc_call: rfc.RFCCall)`
+- `async call_remote_development_function(func, *args, **kwargs)` — RFC only;
+  no local execution for remote-process control operations.
 - `_get_rfc_password() -> str`
 - `_get_rfc_url() -> str`
 - `call_development_function_sync(func: Union[Callable[..., T], Callable[..., Awaitable[T]]], *args, **kwargs) -> T`
@@ -35,6 +37,10 @@
 - Notable constants/configuration names: `T`, `R`.
 
 ## Runtime Contracts
+
+- Remote scheduler pause uses `call_remote_development_function`: unavailable
+  transport raises the typed contract without running the local pause function.
+  Timeout, authentication and remote failures propagate unchanged.
 
 - In development mode, `call_development_function` executes locally only when
   RFC is unconfigured or connection establishment failed. It never retries
