@@ -46,6 +46,22 @@ def test_sidebar_uses_one_fixed_row_menu_with_standard_close_behavior() -> None:
     assert "if (this.rowMenuOpenId === id)" in store
     assert "const openUp = spaceAbove > spaceBelow;" in store
     assert "maxHeight:" in store
+    assert "rowMenuItemId()" in store
+    assert "Save chat" in html
+    assert "Clear chat" in html
+    assert "Delete chat" in html
+    assert "$store.chats.killChat($store.sidebar.rowMenuItemId())" in html
+    assert "$confirmClick" in html
+
+
+def test_chat_hover_action_is_explicitly_labelled_as_delete() -> None:
+    html = (
+        PROJECT_ROOT / "webui/components/sidebar/chats/chat-tree.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'title="Delete chat"' in html
+    assert 'aria-label="Delete chat"' in html
+    assert 'title="Close chat"' not in html
 
 
 def test_pin_plugin_contributes_the_menu_action_and_list_ordering() -> None:

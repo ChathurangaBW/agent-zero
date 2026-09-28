@@ -27,6 +27,9 @@
 - Chat-row action buttons consume layout width only while a pointer row is hovered or while that row is selected on a touch device.
 - Row overflow menus choose the roomier side of their trigger and cap their height to the available viewport so plugin actions remain reachable.
 - Built-in chat and task overflow menus follow the standard row actions; plugin controls remain direct row actions.
+- The chat overflow menu always exposes first-party Save, Clear and Delete
+  actions. Delete uses the shared two-click confirmation and the same
+  optimistic, tombstoned `killChat` path as the hover action.
 - Row overflow buttons retain accessible labels without tooltips; Chats header controls retain their tooltips.
 - `chats.saveChat(ctxid)` exports an explicit context without changing selection; omitted IDs retain current-chat behavior.
 - Cancelling the Load Chat file chooser resolves without calling `chat_load` or showing a success/error notification.

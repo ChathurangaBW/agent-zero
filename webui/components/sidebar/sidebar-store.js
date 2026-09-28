@@ -181,6 +181,12 @@ const model = {
     this.rowMenuStyle = {};
   },
 
+  rowMenuItemId() {
+    const value = String(this.rowMenuOpenId || "");
+    const separator = value.indexOf(":");
+    return separator >= 0 ? value.slice(separator + 1) : "";
+  },
+
   rowMenuClick(event, menuElement) {
     if (!this.rowMenuOpenId || menuElement?.contains(event.target)) return;
     this.rowMenuClose();

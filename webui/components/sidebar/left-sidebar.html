@@ -39,6 +39,25 @@
         <div x-ref="rowActionsMenu" class="dropdown-menu sidebar-row-actions-menu" role="menu"
           x-show="$store.sidebar.rowMenuOpenId" x-transition :style="$store.sidebar.rowMenuStyle"
           style="display: none;" @click.stop>
+          <template x-if="$store.sidebar.rowMenuKind === 'chat'">
+            <div class="sidebar-built-in-row-actions">
+              <button type="button" class="dropdown-item" role="menuitem"
+                @click="$store.chats.saveChat($store.sidebar.rowMenuItemId()); $store.sidebar.rowMenuClose()">
+                <x-icon name="download"></x-icon>
+                <span>Save chat</span>
+              </button>
+              <button type="button" class="dropdown-item" role="menuitem"
+                @click="$confirmClick($event, () => { $store.chats.resetChat($store.sidebar.rowMenuItemId()); $store.sidebar.rowMenuClose() })">
+                <x-icon name="delete_sweep"></x-icon>
+                <span>Clear chat</span>
+              </button>
+              <button type="button" class="dropdown-item" role="menuitem"
+                @click="$confirmClick($event, () => { $store.chats.killChat($store.sidebar.rowMenuItemId()); $store.sidebar.rowMenuClose() })">
+                <x-icon name="delete"></x-icon>
+                <span>Delete chat</span>
+              </button>
+            </div>
+          </template>
           <x-extension id="sidebar-row-actions-menu"></x-extension>
         </div>
       </div>
