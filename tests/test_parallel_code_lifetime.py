@@ -71,3 +71,69 @@ async def test_cancelled_shell_connection_closes_partial_resources(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await tool.prepare_state({"ssh_enabled": False}, session=0)
     shell.close.assert_awaited_once()
+
+
+def test_code_execution_auto_mode_uses_local_tty_without_remote_credentials(monkeypatch):
+    monkeypatch.setattr(code.runtime, "is_dockerized", lambda: False)
+    monkeypatch.setattr(code.dotenv, "get_dotenv_value", lambda _key: None)
+    agent = SimpleNamespace(get_data=lambda _key: None)
+
+    assert code._resolve_ssh_enabled("auto", "", agent) is False
+    assert code._resolve_ssh_enabled("auto", "explicit-password", agent) is True
+    assert code._resolve_ssh_enabled("true", "", agent) is True
+
+
+@pytest.mark.asyncio
+async def test_auto_ssh_connection_refusal_falls_back_once_to_local_tty(monkeypatch):
+    remote = SimpleNamespace(
+        connect=AsyncMock(side_effect=ConnectionRefusedError(111, "refused")),
+        close=AsyncMock(),
+    )
+    local = SimpleNamespace(connect=AsyncMock(), close=AsyncMock())
+    data = {}
+    agent = SimpleNamespace(
+        get_data=lambda key: data.get(key),
+        set_data=lambda key, value: data.__setitem__(key, value),
+        context=SimpleNamespace(log=None),
+    )
+    monkeypatch.setattr(code, "SSHInteractiveSession", lambda *_args, **_kwargs: remote)
+    monkeypatch.setattr(code, "LocalInteractiveSession", lambda **_kwargs: local)
+    tool = object.__new__(code.CodeExecution)
+    tool.agent = agent
+    tool.ensure_cwd = AsyncMock(return_value="/tmp/work")
+
+    state = await tool.prepare_state({
+        "ssh_enabled": True, "ssh_auto": True, "ssh_addr": "127.0.0.1",
+        "ssh_port": 55022, "ssh_user": "root", "ssh_pass": "fixture",
+    }, session=0)
+
+    remote.close.assert_awaited_once()
+    local.connect.assert_awaited_once()
+    assert state.ssh_enabled is False
+    assert state.shells[0].session is local
+    assert data["_cet_auto_local"] is True
+
+
+@pytest.mark.asyncio
+async def test_auto_ssh_authentication_failure_never_retries_locally(monkeypatch):
+    remote = SimpleNamespace(
+        connect=AsyncMock(side_effect=PermissionError("authentication failed")),
+        close=AsyncMock(),
+    )
+    local_factory = AsyncMock()
+    monkeypatch.setattr(code, "SSHInteractiveSession", lambda *_args, **_kwargs: remote)
+    monkeypatch.setattr(code, "LocalInteractiveSession", local_factory)
+    tool = object.__new__(code.CodeExecution)
+    tool.agent = SimpleNamespace(
+        get_data=lambda _key: None, set_data=lambda *_args: None,
+        context=SimpleNamespace(log=None),
+    )
+    tool.ensure_cwd = AsyncMock(return_value="/tmp/work")
+
+    with pytest.raises(PermissionError, match="authentication failed"):
+        await tool.prepare_state({
+            "ssh_enabled": True, "ssh_auto": True, "ssh_addr": "127.0.0.1",
+            "ssh_port": 55022, "ssh_user": "root", "ssh_pass": "bad",
+        }, session=0)
+
+    local_factory.assert_not_awaited()

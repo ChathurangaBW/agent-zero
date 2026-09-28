@@ -1,4 +1,6 @@
-# Shell interface: auto = auto-detect (SSH when non-dockerized, local when dockerized),
+# Shell interface: auto = SSH only when non-dockerized remote credentials are
+# available; otherwise local TTY. An explicitly refused auto-SSH endpoint also
+# falls back locally, while auth/timeouts/ambiguous failures propagate.
 # true = always SSH, false = always local TTY
 ssh_enabled: auto
 

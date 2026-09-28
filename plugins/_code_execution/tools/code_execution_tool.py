@@ -6,7 +6,7 @@ import shlex
 import time
 
 from helpers.tool import Tool, Response
-from helpers import files, rfc_exchange, projects, runtime, secrets, settings
+from helpers import dotenv, files, rfc_exchange, projects, runtime, secrets, settings
 from helpers.print_style import PrintStyle
 from helpers.strings import truncate_text as truncate_text_string
 from helpers.messages import truncate_text as truncate_text_agent
@@ -26,6 +26,18 @@ def _is_closed_pty_error(exc: BaseException) -> bool:
     cause = getattr(exc, "__cause__", None)
     if cause and cause is not exc:
         return _is_closed_pty_error(cause)
+    return False
+
+
+def _is_connection_refused_error(exc: BaseException) -> bool:
+    """Return true only when no SSH connection could have been established."""
+    if isinstance(exc, ConnectionRefusedError):
+        return True
+    if isinstance(exc, OSError) and exc.errno == errno.ECONNREFUSED:
+        return True
+    for linked in (getattr(exc, "__cause__", None), getattr(exc, "__context__", None)):
+        if linked and linked is not exc and _is_connection_refused_error(linked):
+            return True
     return False
 
 
@@ -170,9 +182,29 @@ class CodeExecution(Tool):
             shells[session] = ShellWrap(id=session, session=shell, running=False)
             try:
                 await shell.connect()
-            except BaseException:
+            except BaseException as exc:
                 await shell.close()
-                raise
+                if cfg.get("ssh_auto") and ssh_enabled and _is_connection_refused_error(exc):
+                    # Connection refusal proves that no remote command was
+                    # accepted. Local retry is therefore unambiguous. Other
+                    # errors (auth, timeout, dropped/accepted sessions) must
+                    # propagate to avoid duplicate or misdirected execution.
+                    PrintStyle.warning(
+                        f"Code execution SSH endpoint {cfg['ssh_addr']}:{cfg['ssh_port']} "
+                        "refused the connection; using the local development TTY."
+                    )
+                    self.agent.set_data("_cet_auto_local", True)
+                    shell = LocalInteractiveSession(cwd=cwd)
+                    shells[session] = ShellWrap(id=session, session=shell, running=False)
+                    try:
+                        await shell.connect()
+                    except BaseException:
+                        await shell.close()
+                        raise
+                    ssh_enabled = False
+                else:
+                    del shells[session]
+                    raise
 
         self.state = State(shells=shells, ssh_enabled=ssh_enabled)
         self.agent.set_data("_cet_state", self.state)
@@ -560,10 +592,22 @@ class CodeExecution(Tool):
 # Internal
 # ------------------------------------------------------------------
 
-def _resolve_ssh_enabled(raw_value) -> bool:
+def _resolve_ssh_enabled(raw_value, cfg_pass: str = "", agent=None) -> bool:
     val = str(raw_value).strip().lower()
     if val == "auto":
-        return not runtime.is_dockerized()
+        if runtime.is_dockerized():
+            return False
+        # Native development can reach a remote execution container only when
+        # it has either explicit SSH credentials or an RFC credential capable
+        # of retrieving the container password. With neither, local TTY is the
+        # intended runtime rather than a guaranteed connection failure.
+        if not (str(cfg_pass).strip() or dotenv.get_dotenv_value(dotenv.KEY_RFC_PASSWORD)):
+            return False
+        # Remember a connection-refused fallback for this restored chat. This
+        # prevents every subsequent terminal call from paying two SSH retries.
+        if agent is not None and agent.get_data("_cet_auto_local"):
+            return False
+        return True
     return val in ("true", "1", "yes", "on")
 
 
@@ -605,12 +649,16 @@ def _parse_timeouts(cfg: dict, prefix: str, defaults: tuple[int, ...]) -> dict:
 def _get_config(agent) -> dict:
     cfg = plugins.get_plugin_config("_code_execution", agent=agent) or {}
 
+    ssh_mode = str(cfg.get("ssh_enabled", "auto")).strip().lower()
+    ssh_pass = str(cfg.get("ssh_pass", ""))
+
     return {
-        "ssh_enabled": _resolve_ssh_enabled(cfg.get("ssh_enabled", "auto")),
+        "ssh_enabled": _resolve_ssh_enabled(ssh_mode, ssh_pass, agent),
+        "ssh_auto": ssh_mode == "auto",
         "ssh_addr": _resolve_ssh_addr(str(cfg.get("ssh_addr", ""))),
         "ssh_port": int(cfg.get("ssh_port", 55022)),
         "ssh_user": str(cfg.get("ssh_user", "root")),
-        "ssh_pass": str(cfg.get("ssh_pass", "")),
+        "ssh_pass": ssh_pass,
         "code_exec_timeouts": _parse_timeouts(cfg, "code_exec", (30, 15, 240, 5)),
         "output_timeouts": _parse_timeouts(cfg, "output", (120, 60, 600, 5)),
         "prompt_patterns": _parse_patterns(cfg.get("prompt_patterns", "")),
