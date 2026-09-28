@@ -43,10 +43,12 @@
 - Job IDs are stable handles for later await, collect, or cancel operations. Local code jobs keep their worker until the command completes; reject new-worker output/reset requests.
 - `get_parallel_worker_job(...)` resolves only a registered direct worker. A stateful tool may publish its own model-facing progress to that job while retaining its original resource/event-loop owner; do not substitute arbitrary UI logs for model output.
 - Prompt extras must stay bounded and expose only job IDs, tool names, status, and compact result/error summaries.
+- Uncollected job handles are durably recorded in the parent chat without raw arguments, outputs, or credentials. After a process restart, all recovered handles fail closed as `interrupted`; they are never retried automatically because prior side effects may be uncertain.
+- Starting, finishing, cancelling, and collecting jobs synchronizes the recovery ledger through atomic chat persistence. A restored chat adds a visible warning and lets the model collect the interrupted terminal records or explicitly rerun/reconcile the work.
 
 ## Key Concepts
 
-- The parent context stores in-flight jobs under a private data key; collected terminal jobs are removed from that registry.
+- The parent context stores live objects under a private data key and recovery-safe metadata under `parallel_jobs_recovery`; collected jobs are removed from both registries.
 - `wait=True` starts jobs and awaits them before returning until all requested jobs finish or the wait timeout is reached; the timeout stops waiting but does not cancel running jobs.
 - `collect` returns already-finished job results without waiting; `await` waits for requested job IDs.
 - Canceled jobs should be marked terminal and should stop their background `DeferredTask` when cancellation is possible. Direct-worker finally owns context cleanup on its event loop; collection/cancellation must not race it with a second context reset.

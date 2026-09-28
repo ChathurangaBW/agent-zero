@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field, replace
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
 
 PARALLEL_JOBS_KEY = "_parallel_jobs"
+PARALLEL_JOBS_RECOVERY_KEY = "parallel_jobs_recovery"
 PARALLEL_WORKER_PARENT_CONTEXT_KEY = "_parallel_parent_context_id"
 PARALLEL_WORKER_JOB_KEY = "_parallel_job_id"
 PARALLEL_WORKER_KIND_KEY = "_parallel_worker_kind"
@@ -34,9 +36,18 @@ DEFAULT_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 0.5
 DISALLOWED_PARALLEL_TOOLS = {"document_query", "response", "goal", "input", "input_remote"}
 
-TERMINAL_STATES = {"success", "error", "cancelled", "timeout"}
-JobState = Literal["pending", "running", "success", "error", "cancelled", "timeout"]
+TERMINAL_STATES = {"success", "error", "cancelled", "timeout", "interrupted"}
+JobState = Literal[
+    "pending", "running", "success", "error", "cancelled", "timeout", "interrupted"
+]
 JobKind = Literal["tool", "subordinate"]
+
+_RECOVERY_VERSION = 1
+_RECOVERY_LOCK = threading.RLock()
+_INTERRUPTED_ERROR = (
+    "Parallel job was interrupted by a runtime restart. Its previous execution state "
+    "is uncertain; inspect its child context and explicitly rerun or reconcile it."
+)
 
 
 @dataclass
@@ -214,6 +225,148 @@ def _jobs_for_context(context: "AgentContext") -> dict[str, ParallelJob]:
     return jobs
 
 
+def _recovery_record(job: ParallelJob) -> dict[str, Any]:
+    """Return persistence-safe metadata; never persist tool arguments or outputs here."""
+    record: dict[str, Any] = {
+        "job_id": job.id,
+        "index": job.index,
+        "tool_name": job.tool_name,
+        "kind": job.kind,
+        "state": job.state,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "log_id": job.log_id,
+    }
+    if job.worker_context_id:
+        record["worker_context_id"] = job.worker_context_id
+    return record
+
+
+def _persist_recovery_ledger(context: "AgentContext") -> None:
+    """Atomically persist handles for every uncollected parallel job."""
+    jobs = _jobs_for_context(context)
+    with _RECOVERY_LOCK:
+        context.set_data(
+            PARALLEL_JOBS_RECOVERY_KEY,
+            {
+                "version": _RECOVERY_VERSION,
+                "jobs": [
+                    _recovery_record(job)
+                    for job in sorted(jobs.values(), key=lambda item: (item.index, item.id))
+                    if isinstance(job, ParallelJob)
+                ],
+            },
+        )
+        # Unit-test contexts intentionally omit the real context lifecycle.
+        if not hasattr(context, "type"):
+            return
+        from helpers import persist_chat
+
+        persist_chat.save_tmp_chat(context)
+
+
+def restore_parallel_jobs(context: "AgentContext") -> int:
+    """Restore persisted handles fail-closed after process loss.
+
+    Execution objects, arguments, results, and credentials are deliberately not
+    serialized. Every recovered handle is therefore terminal ``interrupted`` and
+    must be explicitly reconciled or rerun.
+    """
+    if not callable(getattr(context, "get_data", None)):
+        return 0
+    ledger = context.get_data(PARALLEL_JOBS_RECOVERY_KEY)
+    if not isinstance(ledger, dict) or ledger.get("version") != _RECOVERY_VERSION:
+        return 0
+    records = ledger.get("jobs")
+    if not isinstance(records, list):
+        return 0
+
+    restored: dict[str, ParallelJob] = {}
+    log_items = {
+        str(item.id): item
+        for item in getattr(context.log, "logs", [])
+        if getattr(item, "id", None)
+    }
+    now = time.time()
+    for position, record in enumerate(records[:DEFAULT_MAX_CALLS]):
+        if not isinstance(record, dict):
+            continue
+        job_id = str(record.get("job_id") or "")[:80]
+        tool_name = str(record.get("tool_name") or "")[:120]
+        kind = record.get("kind")
+        if not job_id or not tool_name or kind not in {"tool", "subordinate"}:
+            continue
+        log_id = str(record.get("log_id") or "")[:80] or str(uuid.uuid4())
+        job = ParallelJob(
+            id=job_id,
+            parent_context_id=context.id,
+            index=int(record.get("index", position)),
+            tool_name=tool_name,
+            tool_args={},
+            kind=kind,
+            parent_agent=context.agent0,
+            state="interrupted",
+            created_at=_safe_timestamp(record.get("created_at"), now),
+            started_at=_safe_optional_timestamp(record.get("started_at")),
+            completed_at=now,
+            error=_INTERRUPTED_ERROR,
+            worker_context_id=str(record.get("worker_context_id") or "")[:80] or None,
+            log_id=log_id,
+            log_item=log_items.get(log_id),
+        )
+        if job.started_at is None:
+            job.started_at = job.created_at
+        restored[job.id] = job
+
+    if not restored:
+        context.set_data(PARALLEL_JOBS_RECOVERY_KEY, {"version": _RECOVERY_VERSION, "jobs": []})
+        return 0
+
+    context.set_data(PARALLEL_JOBS_KEY, restored)
+    context.log.log(
+        type="warning",
+        heading="Parallel work interrupted",
+        content=(
+            f"{len(restored)} parallel job(s) were active or uncollected when the runtime "
+            "stopped. They were not retried automatically because their prior effects are "
+            "uncertain. Inspect and explicitly rerun or reconcile them."
+        ),
+        update_progress="none",
+    )
+    _sync_recovery_ledger_in_memory(context)
+    return len(restored)
+
+
+def _sync_recovery_ledger_in_memory(context: "AgentContext") -> None:
+    jobs = _jobs_for_context(context)
+    context.set_data(
+        PARALLEL_JOBS_RECOVERY_KEY,
+        {
+            "version": _RECOVERY_VERSION,
+            "jobs": [
+                _recovery_record(job)
+                for job in sorted(jobs.values(), key=lambda item: (item.index, item.id))
+                if isinstance(job, ParallelJob)
+            ],
+        },
+    )
+
+
+def _safe_timestamp(value: Any, default: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if 0 <= parsed <= time.time() + 86400 else default
+
+
+def _safe_optional_timestamp(value: Any) -> float | None:
+    if value is None:
+        return None
+    return _safe_timestamp(value, time.time())
+
+
 def _get_job(parent_context_id: str, job_id: str) -> ParallelJob | None:
     from agent import AgentContext
 
@@ -259,6 +412,7 @@ async def start_parallel_jobs(
             job.started_at = time.time()
             task = DeferredTask(thread_name=THREAD_BACKGROUND)
             job.deferred_task = task
+            _persist_recovery_ledger(context)
             if _parallel_worker_kind(agent) == "subordinate" and context.task:
                 context.task.add_child_task(task)
             task.start_task(_run_parallel_job, context.id, job.id)
@@ -327,6 +481,7 @@ async def cancel_parallel_jobs(agent: "Agent", job_ids: list[str]) -> list[dict[
         snapshots.append(_job_snapshot(job, include_result=True))
         await cleanup_parallel_job(agent, job)
         _jobs_for_context(agent.context).pop(job_id, None)
+        _persist_recovery_ledger(agent.context)
     return snapshots
 
 
@@ -375,6 +530,7 @@ async def collect_parallel_jobs(
             job.parent_history.clear()
         await cleanup_parallel_job(agent, job)
         jobs.pop(job_id, None)
+    _persist_recovery_ledger(agent.context)
 
 
 async def build_parallel_jobs_extras(agent: "Agent") -> str:
@@ -674,6 +830,11 @@ def _finish_job(
     if error is not None:
         job.error = error
     _update_parallel_child_log(job)
+    from agent import AgentContext
+
+    context = AgentContext.get(job.parent_context_id)
+    if context is not None:
+        _persist_recovery_ledger(context)
 
 
 async def _remove_context(context_id: str | None) -> None:

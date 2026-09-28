@@ -1211,6 +1211,90 @@ def test_parallel_result_json_is_compact() -> None:
     assert result == '{"status":"success","jobs":[{"job_id":"wait-1","tool_name":"wait","state":"success"}]}'
 
 
+def test_parallel_recovery_ledger_excludes_arguments_and_outputs() -> None:
+    agent = _FakeAgent()
+    job = parallel_tools.ParallelJob(
+        id="job-sensitive",
+        parent_context_id=agent.context.id,
+        index=0,
+        tool_name="code_execution_tool",
+        tool_args={"code": "token=super-secret"},
+        kind="tool",
+        state="running",
+        result="private output",
+    )
+    agent.context.set_data(parallel_tools.PARALLEL_JOBS_KEY, {job.id: job})
+
+    parallel_tools._persist_recovery_ledger(agent.context)
+
+    ledger = agent.context.get_data(parallel_tools.PARALLEL_JOBS_RECOVERY_KEY)
+    serialized = json.dumps(ledger)
+    assert ledger["version"] == 1
+    assert ledger["jobs"][0]["job_id"] == job.id
+    assert "super-secret" not in serialized
+    assert "private output" not in serialized
+    assert "tool_args" not in serialized
+
+
+def test_parallel_recovery_marks_job_interrupted_without_reexecution() -> None:
+    agent = _FakeAgent()
+    agent.context.set_data(
+        parallel_tools.PARALLEL_JOBS_RECOVERY_KEY,
+        {
+            "version": 1,
+            "jobs": [
+                {
+                    "job_id": "job-before-restart",
+                    "index": 0,
+                    "tool_name": "call_subordinate",
+                    "kind": "subordinate",
+                    "state": "running",
+                    "created_at": 100.0,
+                    "started_at": 101.0,
+                    "log_id": "log-before-restart",
+                    "worker_context_id": "child-context",
+                }
+            ],
+        },
+    )
+    agent.context.agent0 = agent
+
+    restored_count = parallel_tools.restore_parallel_jobs(agent.context)
+
+    assert restored_count == 1
+    restored = agent.context.get_data(parallel_tools.PARALLEL_JOBS_KEY)["job-before-restart"]
+    assert restored.state == "interrupted"
+    assert restored.deferred_task is None
+    assert restored.tool_args == {}
+    assert "explicitly rerun or reconcile" in restored.error
+    assert agent.context.log.items[-1].type == "warning"
+    assert "not retried automatically" in agent.context.log.items[-1].content
+
+
+@pytest.mark.asyncio
+async def test_collecting_interrupted_job_clears_recovery_ledger() -> None:
+    agent = _FakeAgent()
+    job = parallel_tools.ParallelJob(
+        id="job-interrupted",
+        parent_context_id=agent.context.id,
+        index=0,
+        tool_name="call_subordinate",
+        tool_args={},
+        kind="subordinate",
+        state="interrupted",
+        error="restart",
+    )
+    agent.context.set_data(parallel_tools.PARALLEL_JOBS_KEY, {job.id: job})
+
+    await parallel_tools.collect_parallel_jobs(agent, [job.id])
+
+    assert agent.context.get_data(parallel_tools.PARALLEL_JOBS_KEY) == {}
+    assert agent.context.get_data(parallel_tools.PARALLEL_JOBS_RECOVERY_KEY) == {
+        "version": 1,
+        "jobs": [],
+    }
+
+
 @pytest.mark.asyncio
 async def test_parallel_rejects_context_owned_tools_before_starting_any_job():
     agent = _FakeAgent()

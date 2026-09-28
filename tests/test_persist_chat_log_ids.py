@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -88,3 +89,42 @@ def test_save_tmp_chat_preserves_existing_file_until_atomic_replace(
 
     assert json.loads(path.read_text(encoding="utf-8")) == {"new": True}
     assert context.data[persist_chat.SAVED_CHAT_CONTEXT_DATA_KEY] is True
+
+
+def test_parallel_recovery_metadata_survives_chat_round_trip() -> None:
+    from agent import AgentContext
+    from helpers import parallel_tools, persist_chat
+    from initialize import initialize_agent
+
+    context_id = f"parallel-recovery-{uuid.uuid4().hex[:8]}"
+    context = AgentContext(config=initialize_agent(), id=context_id, set_current=False)
+    try:
+        context.set_data(
+            parallel_tools.PARALLEL_JOBS_RECOVERY_KEY,
+            {
+                "version": 1,
+                "jobs": [
+                    {
+                        "job_id": "persisted-job",
+                        "index": 0,
+                        "tool_name": "call_subordinate",
+                        "kind": "subordinate",
+                        "state": "running",
+                        "created_at": 100.0,
+                        "started_at": 101.0,
+                        "log_id": "persisted-log",
+                    }
+                ],
+            },
+        )
+        serialized = persist_chat._serialize_context(context)
+        assert "_parallel_jobs" not in serialized["data"]
+        assert serialized["data"][parallel_tools.PARALLEL_JOBS_RECOVERY_KEY]["jobs"]
+
+        restored = persist_chat._deserialize_context(serialized)
+        assert parallel_tools.restore_parallel_jobs(restored) == 1
+        recovered_job = restored.get_data(parallel_tools.PARALLEL_JOBS_KEY)["persisted-job"]
+        assert recovered_job.state == "interrupted"
+        assert recovered_job.deferred_task is None
+    finally:
+        AgentContext.remove(context_id)

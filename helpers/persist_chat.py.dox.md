@@ -43,6 +43,7 @@
 - Observed side-effect areas: filesystem reads, filesystem writes, filesystem deletion, settings/state persistence, scheduler state.
 - Imported dependency areas include: `agent`, `collections`, `datetime`, `helpers`, `helpers.localization`, `helpers.log`, `initialize`, `json`, `typing`, `uuid`.
 - Serialized chats store `agent_profile` both at the context level for the main chat and on each serialized agent so subordinate profiles survive server restart.
+- Loading a chat reconciles recovery-safe parallel job metadata through `helpers.parallel_tools`: uncollected work becomes terminal `interrupted`, receives a visible warning, and is persisted immediately so a later restart cannot present it as running.
 - Deserialization must rebuild each agent with its serialized profile when present, falling back to the context profile for older chat files.
 - Chat loading skips directories that do not contain `chat.json`; malformed existing chat files still report load errors.
 - Chat saves write and fsync a same-directory temporary file, atomically replace `chat.json`, and fsync the directory so an interrupted save cannot truncate the previous chat.

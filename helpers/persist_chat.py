@@ -85,7 +85,12 @@ def load_tmp_chats():
             js = files.read_file(file)
             data = json.loads(js)
             ctx = _deserialize_context(data)
+            from helpers import parallel_tools
+
+            restored_parallel_jobs = parallel_tools.restore_parallel_jobs(ctx)
             mark_chat_saved(ctx)
+            if restored_parallel_jobs:
+                save_tmp_chat(ctx)
             ctxids.append(ctx.id)
         except Exception as e:
             print(f"Error loading chat {file}: {e}")
@@ -148,6 +153,9 @@ def load_json_chats(jsons: list[str]):
         if "id" in data:
             del data["id"]  # remove id to get new
         ctx = _deserialize_context(data)
+        from helpers import parallel_tools
+
+        parallel_tools.restore_parallel_jobs(ctx)
         ctxids.append(ctx.id)
     return ctxids
 
