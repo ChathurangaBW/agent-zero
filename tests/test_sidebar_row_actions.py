@@ -13,7 +13,18 @@ def test_chat_rows_have_hover_scoped_overflow_actions() -> None:
     assert '<x-component path="sidebar/chats/chat-tree.html"></x-component>' in html
     assert 'class="btn-icon-action chat-list-action-btn"' in html
     assert '<x-icon name="more_vert"></x-icon>' in html
+    assert 'chat-list-action-btn chat-row-overflow-btn' in html
     assert html.count("$store.sidebar.rowMenuToggle(") == 1
+
+
+def test_chat_overflow_menu_stays_available_without_hover() -> None:
+    html = (
+        PROJECT_ROOT / "webui/components/sidebar/chats/chats-list.html"
+    ).read_text(encoding="utf-8")
+
+    assert ".device-pointer .chat-container .chat-row-overflow-btn" in html
+    assert ".device-touch .chat-container:not(.chat-selected) .chat-row-overflow-btn" in html
+    assert "display: inline-flex;" in html
 
 
 def test_task_rows_have_overflow_actions_after_standard_buttons() -> None:

@@ -24,7 +24,7 @@
 - The Tasks list is reserved for scheduler-backed task contexts and must not be used for chat-bound parallel children.
 - Running parent and child chats share the chat-list working-bubble animation; keep it scoped away from task and connection-status indicators.
 - Chat and task lists reclaim the same part of the sidebar's left content inset so their project bubbles align, while their section headers retain the standard sidebar inset.
-- Chat-row action buttons consume layout width only while a pointer row is hovered or while that row is selected on a touch device.
+- Chat-row direct actions consume layout width only while a pointer row is hovered or while that row is selected on a touch device; the overflow menu stays visible so keyboard/touch users can reach Save, Clear and Delete without hover.
 - Row overflow menus choose the roomier side of their trigger and cap their height to the available viewport so plugin actions remain reachable.
 - Built-in chat and task overflow menus follow the standard row actions; plugin controls remain direct row actions.
 - The chat overflow menu always exposes first-party Save, Clear and Delete

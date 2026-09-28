@@ -210,6 +210,11 @@
       margin-right: 8px;
     }
 
+    /* Keep the accessible overflow menu available even when the row is idle. */
+    .chat-row-overflow-btn {
+      display: inline-flex;
+    }
+
     .chat-container:hover{
       background-color: var(--color-background-hover);
     }
@@ -217,6 +222,12 @@
     .device-pointer .chat-container .chat-list-action-btn,
     .device-touch .chat-container:not(.chat-selected) .chat-list-action-btn {
       display: none;
+    }
+
+    .device-pointer .chat-container .chat-row-overflow-btn,
+    .device-touch .chat-container:not(.chat-selected) .chat-row-overflow-btn,
+    .device-touch .chat-container.chat-selected .chat-row-overflow-btn {
+      display: inline-flex;
     }
 
     .device-pointer .chat-container:hover .chat-list-action-btn,

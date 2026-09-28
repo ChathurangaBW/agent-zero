@@ -22,7 +22,7 @@
       <button class="btn-icon-action chat-list-action-btn" title="Delete chat" aria-label="Delete chat" @click.stop="$confirmClick($event, () => $store.chats.killChat(context.id))">
         <x-icon name="close"></x-icon>
       </button>
-      <button type="button" class="btn-icon-action chat-list-action-btn"
+      <button type="button" class="btn-icon-action chat-list-action-btn chat-row-overflow-btn"
         aria-label="More chat actions" aria-haspopup="menu"
         :aria-expanded="($store.sidebar.rowMenuOpenId === `chat:${context.id}`).toString()"
         @click.stop="$store.sidebar.rowMenuToggle(`chat:${context.id}`, 'chat', $event.currentTarget)">
