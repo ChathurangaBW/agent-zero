@@ -59,6 +59,53 @@ def test_load_tmp_chats_skips_directories_without_chat_json(monkeypatch, capsys)
     assert "Error loading chat" not in capsys.readouterr().out
 
 
+def test_load_tmp_chats_clears_and_persists_interrupted_stream(monkeypatch) -> None:
+    from helpers import persist_chat
+
+    context = SimpleNamespace(id="interrupted", data={})
+    saved = []
+    monkeypatch.setattr(persist_chat, "_convert_v080_chats", lambda: None)
+    monkeypatch.setattr(
+        persist_chat.files,
+        "get_abs_path",
+        lambda *parts: "/" + "/".join(str(part).strip("/") for part in parts if part),
+    )
+    monkeypatch.setattr(
+        persist_chat.files, "list_files", lambda folder, pattern="*": ["interrupted"]
+    )
+    monkeypatch.setattr(persist_chat.files, "exists", lambda _path: True)
+    monkeypatch.setattr(
+        persist_chat.files,
+        "read_file",
+        lambda _path: json.dumps({"id": "interrupted", "streaming_agent": 1}),
+    )
+    monkeypatch.setattr(persist_chat, "_deserialize_context", lambda _data: context)
+    monkeypatch.setattr(persist_chat, "save_tmp_chat", saved.append)
+
+    assert persist_chat.load_tmp_chats() == ["interrupted"]
+    assert saved == [context]
+
+
+def test_deserialize_context_does_not_restore_process_local_streamer() -> None:
+    from agent import AgentContext
+    from helpers import persist_chat
+    from initialize import initialize_agent
+
+    context_id = f"interrupted-stream-{uuid.uuid4().hex[:8]}"
+    context = AgentContext(config=initialize_agent(), id=context_id, set_current=False)
+    try:
+        serialized = persist_chat._serialize_context(context)
+        # Subordinate chat snapshots may begin at agent number 1, which used to
+        # make the stale marker resolve to a real Agent object after restart.
+        serialized["agents"][0]["number"] = 1
+        serialized["streaming_agent"] = 1
+        AgentContext.remove(context_id)
+        restored_interrupted = persist_chat._deserialize_context(serialized)
+        assert restored_interrupted.streaming_agent is None
+    finally:
+        AgentContext.remove(context_id)
+
+
 def test_save_tmp_chat_preserves_existing_file_until_atomic_replace(
     monkeypatch, tmp_path
 ) -> None:

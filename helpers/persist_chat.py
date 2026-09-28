@@ -84,12 +84,13 @@ def load_tmp_chats():
         try:
             js = files.read_file(file)
             data = json.loads(js)
+            interrupted_stream = bool(data.get("streaming_agent", 0))
             ctx = _deserialize_context(data)
             from helpers import parallel_tools
 
             restored_parallel_jobs = parallel_tools.restore_parallel_jobs(ctx)
             mark_chat_saved(ctx)
-            if restored_parallel_jobs:
+            if restored_parallel_jobs or interrupted_stream:
                 save_tmp_chat(ctx)
             ctxids.append(ctx.id)
         except Exception as e:
@@ -282,13 +283,13 @@ def _deserialize_context(data):
 
     agents = data.get("agents", [])
     agent0 = _deserialize_agents(agents, config, context)
-    streaming_agent = agent0
-    while streaming_agent and streaming_agent.number != data.get("streaming_agent", 0):
-        streaming_agent = streaming_agent.data.get(Agent.DATA_NAME_SUBORDINATE, None)
-
     context.agent0 = agent0
     context.config = agent0.config
-    context.streaming_agent = streaming_agent
+    # A persisted streamer belonged to the process that wrote this snapshot.
+    # Deserialization never has a live execution object to back that marker, so
+    # restoring it would leave the chat permanently "running" after a restart.
+    # Durable/parallel work is reconciled separately from its recovery ledger.
+    context.streaming_agent = None
 
     return context
 
