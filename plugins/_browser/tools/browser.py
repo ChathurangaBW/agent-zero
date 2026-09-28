@@ -305,7 +305,14 @@ class Browser(Tool):
             elif action == "multi":
                 if not calls:
                     raise ValueError("multi requires non-empty 'calls' list")
-                result = await runtime.call("multi", list(calls))
+                normalized_calls = []
+                for call in calls:
+                    call = dict(call)
+                    for field in ("ref", "target_ref"):
+                        if self._has_ref(call.get(field)):
+                            call[field] = self._normalize_ref(call[field])
+                    normalized_calls.append(call)
+                result = await runtime.call("multi", normalized_calls)
             elif action == "close":
                 result = await runtime.call("close_browser", browser_id)
             elif action == "close_all":
@@ -331,10 +338,23 @@ class Browser(Tool):
         )
 
     @staticmethod
+    def _normalize_ref(ref: int | str) -> int | str:
+        """Accept the typed labels returned by content as well as numeric IDs."""
+        if not isinstance(ref, str):
+            return ref
+        value = ref.strip()
+        if value.startswith("[") and value.endswith("]"):
+            value = value[1:-1].strip()
+        match = re.fullmatch(r"(?:[A-Za-z][\w-]*\s+)+(\d+)", value)
+        if match:
+            return match.group(1)
+        return value if value.isdecimal() else ref
+
+    @staticmethod
     def _require_ref(ref: int | str | None) -> int | str:
         if ref is None or str(ref).strip() == "":
             raise ValueError("ref is required for this browser action")
-        return ref
+        return Browser._normalize_ref(ref)
 
     @staticmethod
     def _has_ref(ref: int | str | None) -> bool:
@@ -356,7 +376,7 @@ class Browser(Tool):
         required: bool = True,
     ) -> int | str | None:
         if cls._has_ref(ref):
-            return ref
+            return cls._normalize_ref(ref)
 
         selector = str(selector or "").strip()
         if selector:

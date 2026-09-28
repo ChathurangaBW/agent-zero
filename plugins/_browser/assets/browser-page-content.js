@@ -1,7 +1,7 @@
 (() => {
   const GLOBAL_KEY = "__spaceBrowserPageContent__";
   const DOM_HELPER_KEY = "__spaceBrowserDomHelper__";
-  const VERSION = "13";
+  const VERSION = "14";
   const REQUIRED_API_NAMES = Object.freeze([
     "annotate",
     "boundingBoxFor",
@@ -535,7 +535,11 @@
     }
 
     if (typeof value === "string") {
-      return value.trim();
+      const trimmed = value.trim();
+      const label = trimmed.startsWith("[") && trimmed.endsWith("]")
+        ? trimmed.slice(1, -1).trim() : trimmed;
+      const typed = label.match(/^(?:[A-Za-z][\w-]*\s+)+(\d+)$/u);
+      return typed ? typed[1] : /^\d+$/u.test(label) ? label : trimmed;
     }
 
     if (value && typeof value === "object") {

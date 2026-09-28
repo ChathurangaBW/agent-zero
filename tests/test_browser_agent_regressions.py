@@ -2260,7 +2260,7 @@ def test_browser_content_helper_keeps_label_wrapped_controls_referenceable():
         PROJECT_ROOT / "plugins" / "_browser" / "assets" / "browser-page-content.js"
     ).read_text(encoding="utf-8")
 
-    assert 'const VERSION = "13"' in helper
+    assert 'const VERSION = "14"' in helper
     assert "function patchOpenShadowDom" in helper
     assert "Element.prototype.attachShadow = patched" in helper
     assert "const REQUIRED_API_NAMES = Object.freeze([" in helper
@@ -3443,6 +3443,52 @@ async def test_browser_tool_dispatches_v1_agent_actions(monkeypatch):
         ("mouse", (1, "click", 10, 20), {"button": "left", "modifiers": None}),
         ("keyboard", (1,), {"key": "", "text": "agent-zero.ai"}),
     ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("reference", [2, "2", "button 2", "[button 2]", "[input text 2]"])
+async def test_browser_tool_click_accepts_content_reference_labels_once(monkeypatch, reference):
+    calls = []
+
+    class FakeRuntime:
+        async def call(self, method, *args, **kwargs):
+            calls.append((method, args, kwargs))
+            return {"ok": True}
+
+    async def fake_get_runtime(*args, **kwargs):
+        return FakeRuntime()
+
+    monkeypatch.setattr(browser_tool_module, "get_runtime", fake_get_runtime)
+    tool = browser_tool_module.Browser(
+        agent=SimpleNamespace(context=SimpleNamespace(id="ctx")), name="browser",
+        method=None, args={}, message="", loop_data=None,
+    )
+    response = await tool.execute(action="click", browser_id=1, ref=reference)
+    assert "failed" not in response.message
+    assert calls == [("click", (1, 2 if isinstance(reference, int) else "2"), {})]
+
+
+@pytest.mark.anyio
+async def test_browser_multi_normalizes_refs_without_mutating_caller_program(monkeypatch):
+    calls = []
+
+    class FakeRuntime:
+        async def call(self, method, *args, **kwargs):
+            calls.append((method, args))
+            return []
+
+    async def fake_get_runtime(*args, **kwargs):
+        return FakeRuntime()
+
+    monkeypatch.setattr(browser_tool_module, "get_runtime", fake_get_runtime)
+    tool = browser_tool_module.Browser(
+        agent=SimpleNamespace(context=SimpleNamespace(id="ctx")), name="browser",
+        method=None, args={}, message="", loop_data=None,
+    )
+    program = [{"action": "click", "browser_id": 1, "ref": "[button 2]"}]
+    await tool.execute(action="multi", calls=program)
+    assert calls == [("multi", ([{"action": "click", "browser_id": 1, "ref": "2"}],))]
+    assert program[0]["ref"] == "[button 2]"
 
 
 @pytest.mark.anyio

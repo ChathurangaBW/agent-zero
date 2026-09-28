@@ -31,6 +31,7 @@ For fragile forms, load `browser-form-workflows` with `skills_tool:load` before 
 1. `open` creates a browser tab and returns a `browser_id`.
 2. `content` returns readable markdown plus typed refs like `[link 3]`, `[button 6]`, `[input text 8]`.
 3. Interact with refs using `click`, `type`, `submit`, `scroll`, etc.; iframe/shadow targets may return frame-chain metadata in action results.
+   Pass the reference ID (`"2"`) or its complete typed label (`"button 2"` or `"[button 2]"`); all forms address the same captured element. If a reference is disconnected, refresh `content` and inspect the new target before acting.
 4. Use `navigate` on an existing `browser_id` for serial browsing.
 5. Keep only a small working tab set; close pages when finished.
 6. If the user asks for an existing tab, page title, or already-open URL, call `list` first, match by `title` or `currentUrl`, then use `set_active` or `navigate` on that `browser_id` instead of opening a new tab.
