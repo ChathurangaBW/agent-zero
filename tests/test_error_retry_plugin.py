@@ -142,3 +142,34 @@ def test_provider_refusal_is_left_for_critical_error_handler(monkeypatch):
     assert isinstance(data["exception"], retry_module.HandledException)
     assert agent.context.log.entries[0]["type"] == "error"
     assert "Provider refused" in agent.context.log.entries[0]["content"]
+
+
+def test_exhausted_provider_allowance_is_not_retried_and_is_reported_once(monkeypatch):
+    _set_retry_config(monkeypatch, 3)
+    agent = FakeAgent()
+    agent.agent_name = "A0"
+    exception = retry_module.litellm.RateLimitError(
+        message=('OpenAIException - {"error":{"type":"usage_limit_reached",'
+                 '"plan_type":"plus","resets_in_seconds":7645}}'),
+        model="gpt-test", llm_provider="openai",
+    )
+    data = {"exception": exception}
+
+    asyncio.run(retry_module.RetryCriticalException(agent=agent).execute(data))
+
+    assert data["exception"] is exception
+    assert agent.get_data(DATA_NAME_COUNTER) == 0
+    assert agent.interventions == 0
+    assert agent.warnings == []
+    assert agent.context.log.entries == []
+
+    critical = importlib.import_module(
+        "extensions.python._functions.agent.Agent.handle_exception.end._90_handle_critical_exception"
+    )
+    asyncio.run(critical.HandleCriticalException(agent=agent).execute(data))
+    assert isinstance(data["exception"], retry_module.HandledException)
+    assert len(agent.context.log.entries) == 1
+    content = agent.context.log.entries[0]["content"]
+    assert "usage limit reached for the plus plan" in content.lower()
+    assert "2h 8m" in content
+    assert "Traceback" not in content

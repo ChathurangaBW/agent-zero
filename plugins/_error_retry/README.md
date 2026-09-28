@@ -12,6 +12,8 @@ It does **not** retry exceptions that are already treated as controlled agent fl
 - `RepairableException`
 
 Provider refusals (`ContentPolicyViolationError`) also stop with a visible error instead of retrying or injecting repair instructions.
+Provider allowance exhaustion (`usage_limit_reached`) is likewise terminal for
+the current turn and is shown once with the reported reset interval.
 
 ## Main Behavior
 

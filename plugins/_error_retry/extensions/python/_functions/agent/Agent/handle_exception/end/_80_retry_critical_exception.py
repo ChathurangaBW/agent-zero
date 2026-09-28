@@ -14,6 +14,14 @@ DEFAULT_MAX_RETRIES = 1
 RETRY_DELAY_SECONDS = 3
 
 
+def is_non_retryable_provider_error(exception: BaseException) -> bool:
+    """Return true for provider outcomes a short local retry cannot repair."""
+    if isinstance(exception, litellm.ContentPolicyViolationError):
+        return True
+    return (isinstance(exception, litellm.RateLimitError)
+            and "usage_limit_reached" in str(exception).lower())
+
+
 def normalize_max_retries(value, default: int = DEFAULT_MAX_RETRIES) -> int:
     if value is None or isinstance(value, bool):
         return default
@@ -38,8 +46,8 @@ class RetryCriticalException(Extension):
             self.agent.set_data(DATA_NAME_COUNTER, 0) # reset counter if exception has been handled
             return
 
-        if isinstance(exception, litellm.ContentPolicyViolationError):
-            return  # Let the critical-error handler log the refusal and stop.
+        if is_non_retryable_provider_error(exception):
+            return  # Let the critical-error handler report the terminal provider outcome once.
 
         cfg = plugins.get_plugin_config("_error_retry", agent=self.agent) or {}
         max_retries = normalize_max_retries(cfg.get("retries"))

@@ -19,6 +19,7 @@
 - `get_local_url()`
 - `get_runtime_id() -> str`
 - `get_persistent_id() -> str`
+- `_warn_rfc_fallback_once(message: str) -> None`
 - `async call_development_function(func: Callable[..., Awaitable[T]], *args, **kwargs) -> T`
 - `async call_development_function(func: Callable[..., T], *args, **kwargs) -> T`
 - `async call_development_function(func: Union[Callable[..., T], Callable[..., Awaitable[T]]], *args, **kwargs) -> T`
@@ -39,6 +40,9 @@
   RFC is unconfigured or connection establishment failed. It never retries
   locally after timeouts, HTTP errors, authentication failures, or remote
   function failures, so a mutating function executes at most once.
+- Repeated fallback for the same unavailable RFC endpoint remains functional
+  but emits its development warning once per process/message instead of
+  flooding long-running service logs.
 - Helper modules own reusable framework APIs and must preserve public callers unless all callers, tests, and docs are updated together.
 - Update this file whenever public functions, classes, persistence behavior, path/security assumptions, side effects, or cross-module contracts change.
 - Observed side-effect areas: filesystem reads, filesystem writes, subprocess/runtime control, settings/state persistence, secret handling, tunnel state.

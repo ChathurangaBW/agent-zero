@@ -15,6 +15,9 @@
 
 - Do not retry controlled flow exceptions such as `HandledException` and `RepairableException`.
 - Do not retry LiteLLM `ContentPolicyViolationError`; leave it for the core critical-error handler to log and stop, without injecting repair instructions or clearing media.
+- Do not retry a LiteLLM rate-limit response carrying
+  `usage_limit_reached`; the provider allowance cannot recover through a
+  short local retry. Leave it for the critical-error handler to present once.
 - Keep retry counts scoped per monologue.
 - Preserve clear agent-facing history injection when retrying a critical exception.
 

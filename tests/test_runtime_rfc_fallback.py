@@ -7,6 +7,7 @@ from helpers import rfc, runtime
 
 @pytest.fixture(autouse=True)
 def development_runtime(monkeypatch):
+    runtime._warned_rfc_unavailable.clear()
     monkeypatch.setattr(runtime, "is_development", lambda: True)
     monkeypatch.setattr(
         runtime, "_get_rfc_url", lambda: "http://127.0.0.1:55080/api/rfc"
@@ -49,6 +50,28 @@ async def test_connector_failure_falls_back_to_sync_function_once(monkeypatch):
     assert await runtime.call_development_function(operation, 6) == 12
     assert len(remote_calls) == 1
     assert local_calls == [6]
+
+
+@pytest.mark.asyncio
+async def test_repeated_connector_outage_warns_once_but_each_call_runs_locally(monkeypatch):
+    monkeypatch.setattr(runtime, "_get_rfc_password", lambda: "configured")
+    warnings = []
+    monkeypatch.setattr("helpers.print_style.PrintStyle.warning", warnings.append)
+
+    async def unavailable(**kwargs):
+        raise rfc.RFCUnavailableError("connection refused")
+
+    calls = []
+
+    def operation():
+        calls.append(True)
+        return "local"
+
+    monkeypatch.setattr(runtime.rfc, "call_rfc", unavailable)
+    assert await runtime.call_development_function(operation) == "local"
+    assert await runtime.call_development_function(operation) == "local"
+    assert calls == [True, True]
+    assert warnings == ["RFC fallback to direct: connection refused"]
 
 
 @pytest.mark.asyncio

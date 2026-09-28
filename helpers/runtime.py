@@ -19,6 +19,8 @@ parser = argparse.ArgumentParser()
 args = {}
 dockerman = None
 runtime_id = None
+_rfc_warning_lock = threading.Lock()
+_warned_rfc_unavailable = set()
 
 
 def initialize():
@@ -85,6 +87,16 @@ def get_persistent_id() -> str:
     return id
 
 
+def _warn_rfc_fallback_once(message: str) -> None:
+    """Keep an expected development outage visible without flooding logs."""
+    with _rfc_warning_lock:
+        if message in _warned_rfc_unavailable:
+            return
+        _warned_rfc_unavailable.add(message)
+    from helpers.print_style import PrintStyle
+    PrintStyle.warning(f"RFC fallback to direct: {message}")
+
+
 @overload
 async def call_development_function(
     func: Callable[..., Awaitable[T]], *args, **kwargs
@@ -120,9 +132,7 @@ async def call_development_function(
             # A connector failure means no RFC request was accepted, so a
             # local fallback cannot duplicate remote work. Ambiguous timeout,
             # response, authentication, and remote-function errors propagate.
-            from helpers.print_style import PrintStyle
-
-            PrintStyle.warning(f"RFC fallback to direct: {exc}")
+            _warn_rfc_fallback_once(str(exc))
             if inspect.iscoroutinefunction(func):
                 return await func(*args, **kwargs)
             else:
