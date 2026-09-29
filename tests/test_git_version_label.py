@@ -79,3 +79,20 @@ def test_git_version_label_hides_commit_distance_on_main(tmp_path):
     assert info.release is not None
     assert info.release.short_tag == "v1.9"
     assert info.release.version == "M v1.9"
+
+
+def test_read_only_git_queries_close_temporary_repository_handles(monkeypatch):
+    closed = []
+
+    class FakeRepo:
+        bare = True
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(git, "Repo", lambda path: FakeRepo())
+
+    info = git.get_repo_release_info("fixture")
+
+    assert not info.is_git_repo
+    assert closed == [True]

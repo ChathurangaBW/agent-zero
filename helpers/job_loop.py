@@ -31,9 +31,9 @@ async def run_iteration():
             pass
         except Exception as e:
             PrintStyle().error("Failed to pause job loop by development instance: " + errors.error_text(e))
-            # An ambiguous/remote error may leave that scheduler running;
-            # do not execute duplicate local scheduled work this iteration.
-            return
+            # Preserve the local scheduler lifecycle. The remote pause is a
+            # best-effort development convenience; suppressing this cycle
+            # starves native maintenance and plugin recovery work.
     if not keep_running and (time.time() - pause_time) > (SLEEP_TIME * 2):
         resume_loop()
     if keep_running:

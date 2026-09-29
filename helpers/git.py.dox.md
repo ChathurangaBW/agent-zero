@@ -33,6 +33,10 @@
 - `DirtyTreeConflictError`: Reports the conflicting files when a plugin update is rolled back because local commits or edits conflict with upstream.
 - `update_repo(repo_path: str, auto_stash: bool = True) -> Repo`: Fetches the configured tracking branch and rebases local commits, temporarily stashing tracked edits. Aborts its own failed rebase and restores original commits and edits before reporting conflicts; refuses pre-existing Git operations.
 - `get_repo_status(repo_path: str) -> dict`: Get Git repository status, ignoring A0 project metadata files.
+- `_close_repo(repo: Repo | None) -> None`: Closes temporary GitPython repository
+  handles after read-only metadata/status queries, releasing their `git cat-file`
+  subprocesses promptly. Functions that return a live `Repo` (`clone_repo` and
+  `update_repo`) retain caller ownership and are not closed here.
 - Notable constants/configuration names: `A0_IGNORE_PATTERNS`.
 
 ## Runtime Contracts

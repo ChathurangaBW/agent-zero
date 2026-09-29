@@ -54,15 +54,17 @@ async def test_successful_remote_pause_never_calls_local_pause(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", [asyncio.TimeoutError("ambiguous"), PermissionError("auth"), RuntimeError("remote")])
-async def test_ambiguous_pause_skips_local_cycle_without_local_fallback(monkeypatch, failure):
+async def test_ambiguous_pause_keeps_local_scheduler_progressing(monkeypatch, failure):
     monkeypatch.setattr(runtime, "_get_rfc_password", lambda: "fixture")
     async def fail(**kwargs):
         raise failure
+    calls = []
     async def local_tick():
-        pytest.fail("potential duplicate scheduler execution")
+        calls.append("tick")
     monkeypatch.setattr(runtime.rfc, "call_rfc", fail)
     monkeypatch.setattr(job_loop, "scheduler_tick", local_tick)
     await job_loop.run_iteration()
+    assert calls == ["tick"]
     assert job_loop.keep_running is True
 
 

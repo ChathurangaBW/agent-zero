@@ -6,8 +6,9 @@
   running even when no development RFC transport exists. Container pause is
   remote-only: it must never fall back to pausing this process.
 - `run_iteration()` performs one bounded scheduler cycle; `run_loop()` owns the
-  existing 60-second interval. Ambiguous/auth/remote pause errors skip the local
-  cycle to avoid duplicate scheduling. Explicit local pause/resume stays intact.
+  existing 60-second interval. Remote pause errors are reported, then the local
+  cycle continues so native maintenance and plugin recovery work are not
+  starved. Explicit local pause/resume stays intact.
 
 - Own the `job_loop.py` helper module.
 - This module runs periodic scheduler and maintenance loops.

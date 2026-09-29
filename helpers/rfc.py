@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import json
+import errno
 from typing import Any, TypedDict
 import aiohttp
 from helpers import crypto
@@ -90,4 +91,11 @@ async def _send_json_data(url: str, data):
                     error = await response.text()
                     raise Exception(error)
     except aiohttp.ClientConnectorError as exc:
-        raise RFCUnavailableError(f"RFC endpoint is unavailable: {exc}") from exc
+        # A connector error includes TLS, DNS and other post-resolution
+        # failures. Only a refused TCP connection is known not to have
+        # reached the RFC endpoint, so only that condition may trigger a
+        # direct local fallback.
+        os_error = getattr(exc, "os_error", None)
+        if isinstance(os_error, ConnectionRefusedError) or getattr(os_error, "errno", None) == errno.ECONNREFUSED:
+            raise RFCUnavailableError(f"RFC endpoint is unavailable: {exc}") from exc
+        raise

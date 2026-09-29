@@ -12,6 +12,15 @@ from helpers import files
 from helpers.localization import Localization
 
 
+def _close_repo(repo: Repo | None) -> None:
+    """Release GitPython's persistent cat-file helpers for read-only queries."""
+    if repo is None:
+        return
+    close = getattr(repo, "close", None)
+    if callable(close):
+        close()
+
+
 def strip_auth_from_url(url: str) -> str:
     """Remove any authentication info from URL."""
     if not url:
@@ -210,6 +219,7 @@ def get_remote_releases(author: str, repo: str) -> GitRemoteReleasesResult:
 
 
 def get_remote_commits_since_local(repo_path: str) -> GitRemoteCommitsInfo:
+    repo = None
     try:
         repo = Repo(repo_path)
         if repo.bare:
@@ -281,9 +291,12 @@ def get_remote_commits_since_local(repo_path: str) -> GitRemoteCommitsInfo:
             last_remote_commit_at="",
             error=str(e),
         )
+    finally:
+        _close_repo(repo)
 
 
 def get_repo_release_info(repo_path: str) -> GitRepoReleaseInfo:
+    repo = None
     try:
         repo = Repo(repo_path)
         if repo.bare:
@@ -378,6 +391,8 @@ def get_repo_release_info(repo_path: str) -> GitRepoReleaseInfo:
             release=None,
             error=str(e),
         )
+    finally:
+        _close_repo(repo)
 
 
 def get_git_info():
@@ -407,6 +422,7 @@ def get_version():
 
 def is_official_agent_zero_repo() -> bool:
     """Return True when origin points to agent0ai/agent-zero."""
+    repo = None
     try:
         repo = Repo(files.get_base_dir())
         if not repo.remotes:
@@ -428,6 +444,8 @@ def is_official_agent_zero_repo() -> bool:
         )
     except Exception:
         return False
+    finally:
+        _close_repo(repo)
 
 
 def clone_repo(url: str, dest: str, token: str | None = None):
@@ -544,6 +562,7 @@ A0_IGNORE_PATTERNS = {".a0proj", ".a0proj/"}
 
 def get_repo_status(repo_path: str) -> dict:
     """Get Git repository status, ignoring A0 project metadata files."""
+    repo = None
     try:
         repo = Repo(repo_path)
         if repo.bare:
@@ -602,3 +621,5 @@ def get_repo_status(repo_path: str) -> dict:
         }
     except Exception as e:
         return {"is_git_repo": False, "error": str(e)}
+    finally:
+        _close_repo(repo)

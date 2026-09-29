@@ -24,9 +24,10 @@
 ## Runtime Contracts
 
 - `RFCUnavailableError` is raised only when connection establishment failed
-  before the endpoint could accept a request. HTTP errors, timeouts, and
-  post-connect failures are not converted because retrying them locally could
-  duplicate a remotely accepted mutation.
+  because TCP was refused before the endpoint could accept a request. TLS,
+  DNS, HTTP errors, timeouts, and post-connect failures are not converted
+  because retrying them locally could duplicate a remotely accepted mutation
+  or bypass transport validation.
 - Helper modules own reusable framework APIs and must preserve public callers unless all callers, tests, and docs are updated together.
 - Update this file whenever public functions, classes, persistence behavior, path/security assumptions, side effects, or cross-module contracts change.
 - Observed side-effect areas: filesystem writes, network calls, settings/state persistence, secret handling.

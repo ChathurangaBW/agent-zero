@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 
 import pytest
 
@@ -147,3 +148,30 @@ async def test_rfc_http_error_is_not_reclassified_as_unavailable(monkeypatch):
     with pytest.raises(Exception, match="remote error") as exc:
         await rfc._send_json_data("http://127.0.0.1", {})
     assert not isinstance(exc.value, rfc.RFCUnavailableError)
+
+
+@pytest.mark.asyncio
+async def test_rfc_tls_failure_is_not_reclassified_as_unavailable(monkeypatch):
+    from aiohttp.client_reqrep import ConnectionKey
+
+    connection_key = ConnectionKey(
+        host="127.0.0.1", port=55080, is_ssl=True, ssl=True,
+        proxy=None, proxy_auth=None, proxy_headers_hash=None,
+    )
+    certificate_error = rfc.aiohttp.ClientConnectorCertificateError(
+        connection_key, ssl.CertificateError("untrusted fixture certificate")
+    )
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        def post(self, *args, **kwargs):
+            raise certificate_error
+
+    monkeypatch.setattr(rfc.aiohttp, "ClientSession", Session)
+    with pytest.raises(rfc.aiohttp.ClientConnectorCertificateError):
+        await rfc._send_json_data("https://127.0.0.1", {})
