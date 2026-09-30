@@ -9,6 +9,9 @@
 
 - `README.md`, `quickstart.md`, `guides/`, and `setup/` cover user-facing setup and workflows.
 - `developer/` covers compact developer references and source handoffs.
+- `developer/web-pentest-handoff.md` records the dated pentest delivery baseline,
+  verification limits and prioritized continuation work; refresh its claims
+  against source and acceptance evidence when the baseline changes.
 - `plans/` covers implementation plans, migration notes, and staged technical roadmaps.
 - `res/` contains documentation images and other documentation assets.
 
