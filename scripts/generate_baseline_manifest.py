@@ -39,12 +39,15 @@ def run(args, cwd, timeout=240):
 
 
 def build(root: Path, framework_python: str, capture_python: str) -> dict:
+    committed_head = run(["git", "rev-parse", "HEAD"], root)
+    committed_subject = run(["git", "log", "-1", "--format=%s"], root)
+    branch = run(["git", "branch", "--show-current"], root)
     manifest: dict = {
         "schema": SCHEMA,
         "committed_baseline": {
-            "commit": "29ff9f379a3daf99c8daa3cb0dd76e63082d98f4",
-            "subject": "fix(web-pentest): fence managed execution and proxy egress",
-            "branch": "feat/web-pentest-engine",
+            "commit": committed_head,
+            "subject": committed_subject,
+            "branch": branch,
         },
         "workspace": {
             "git_log": run(["git", "log", "-1", "--format=%H %s"], root),

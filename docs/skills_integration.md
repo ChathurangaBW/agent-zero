@@ -19,8 +19,8 @@ Skill paths:
 | recon-fingerprint | MAP-01, CONFIG-01, SOURCE-01 | httpx, wappalyzer-cli, semgrep | implemented | RECON/v1 | fingerprint server, framework and headers for an in-scope URL |
 | exploit-sqli | INJ-01, BLIND-01 | sqlmap, interactsh-client | candidate_generation | INJ/v1 | test SQL injection parameters with baseline and negative controls |
 | exploit-xss | XSS-01 | dalfox, browser | candidate_generation | XSS/v1 | test reflected, stored and DOM cross-site scripting contexts |
-| exploit-lfi | FILE-01 | ffuf, nuclei | guided | FILE/v1 | test local file inclusion and path traversal boundaries |
-| exploit-filedownload | FILE-01 | nuclei, transport | guided | FILE/v1 | test arbitrary file download and upload parser boundaries |
+| exploit-lfi | FILE-01 | ffuf, nuclei | guided | FILE/v2 | test local file inclusion and path traversal boundaries |
+| exploit-filedownload | FILE-01 | nuclei, transport | guided | FILE/v2 | test arbitrary file download and upload parser boundaries |
 | pentest-report | CHAIN-01, CONFIG-01 | proof-capsule, report-capsule | implemented | CHAIN/v1 | compile confirmed findings, candidates and coverage into a replayable report |
 
 `helpers/methodology.py:21-40` defines `SKILL_WORKFLOWS` — the SKILL.md pattern (trigger + toolchain + analysis) for the 8 commercial pentest-skills plus the report skill. Methodology cards reference these so agents pick the right toolchain and prove every finding with a verifier. Keys: recon-ports, recon-subdomains, recon-dirs, recon-fingerprint, exploit-sqli, exploit-xss, exploit-lfi, exploit-filedownload, pentest-report (lines 21-40).
@@ -43,7 +43,7 @@ Analysis rule per skill (from test_modules.py:50-123): correlate candidates with
 `helpers/test_modules.py:20-29` defines `VERIFIERS` — typed verifiers: every catalogue test declares its independent verifier. AUTHZ-01/v2 is the only fully automatic confirmer; the rest are prove-every-finding verifiers (fresh controls + proof-capsule replay):
 - MAP-01: RECON/v1, AUTHZ-01: AUTHZ-01/v2, AUTHZ-02/03/04: AUTHZ/v1
 - AUTHN-01/02, SESS-01: SESSION/v1, ORIGIN-01: ORIGIN/v1
-- INJ-01: INJ/v1, XSS-01: XSS/v1, FILE-01: FILE/v1, API-01/02: API/v1, API-03: None
+- INJ-01: INJ/v1, XSS-01: XSS/v1, FILE-01: FILE/v2, API-01/02: API/v1, API-03: None
 - BLIND-01: BLIND/v1, LOGIC-01: LOGIC/v1, RACE-01: RACE/v1
 - HTTP-01: HTTP/v1, HTTP-02: None, CONFIG-01: RECON/v1, CHAIN-01: CHAIN/v1, SOURCE-01: SOURCE/v1
 
