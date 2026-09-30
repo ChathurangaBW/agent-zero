@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 
 KEY_FILES = [
+    "plugins/_web_pentest/integration.py",
+    "plugins/_web_pentest/api/assessment.py",
     "plugins/_web_pentest/helpers/portfolio.py",
     "plugins/_web_pentest/helpers/service.py",
     "plugins/_web_pentest/helpers/closure.py",
